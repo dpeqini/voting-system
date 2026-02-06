@@ -5,20 +5,24 @@
          http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.0</version>
+        <relativePath/>
+    </parent>
+
     <groupId>com.danjel</groupId>
     <artifactId>voting-system</artifactId>
     <version>1.0-SNAPSHOT</version>
-    <packaging>pom</packaging>  <!-- Important! -->
+    <packaging>pom</packaging>
 
     <modules>
-        <!-- We'll add these after creating modules -->
-        <module>voting-backend</module>
         <module>blockchain-core</module>
+        <module>voting-backend</module>
     </modules>
 
     <properties>
         <java.version>17</java.version>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
     </properties>
 </project>

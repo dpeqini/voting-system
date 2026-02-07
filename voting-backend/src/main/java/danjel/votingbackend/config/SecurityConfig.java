@@ -43,26 +43,32 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
+
                         // Public endpoints
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/public/**").permitAll()
-                        .requestMatchers("/api/health").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/elections/active").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/elections/*/public").permitAll()
+                        .requestMatchers("/api/v1/auth/**").permitAll()
+                        .requestMatchers("/api/v1/public/**").permitAll()
+                        .requestMatchers("/api/v1/health").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/elections/active").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/elections/*/public").permitAll()
 
                         // Admin endpoints
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/elections").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/elections/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/elections/**").hasRole("ADMIN")
-                        .requestMatchers("/api/elections/*/import-candidates").hasRole("ADMIN")
-                        .requestMatchers("/api/elections/*/start").hasRole("ADMIN")
-                        .requestMatchers("/api/elections/*/close").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/elections").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/elections/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/elections/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/elections/*/import-candidates").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/elections/*/start").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/elections/*/close").hasRole("ADMIN")
 
                         // Voter endpoints
-                        .requestMatchers("/api/vote/**").hasAnyRole("VOTER", "ADMIN")
-                        .requestMatchers("/api/verification/**").hasAnyRole("VOTER", "ADMIN")
+                        .requestMatchers("/api/v1/vote/**").hasAnyRole("VOTER", "ADMIN")
+                        .requestMatchers("/api/v1/verification/**").hasAnyRole("VOTER", "ADMIN")
 
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
                         // All other requests require authentication
                         .anyRequest().authenticated()
                 )

@@ -1,12 +1,14 @@
 package danjel.votingbackend.utils.enums;
 
 
-public enum UserRole {
-    VOTER("VOTER");
+public enum AdminRole {
+    ADMIN("ADMIN"),
+    ELECTION_OFFICIAL("ELECTION_OFFICIAL"),
+    OBSERVER("OBSERVER");
 
     private final String displayName;
 
-    UserRole(String displayName) {
+    AdminRole(String displayName) {
         this.displayName = displayName;
     }
 

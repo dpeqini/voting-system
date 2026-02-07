@@ -1,7 +1,8 @@
 package danjel.votingbackend.model;
 
 
-import danjel.votingbackend.utils.enums.*;
+import danjel.votingbackend.utils.enums.AlbanianCounty;
+import danjel.votingbackend.utils.enums.AlbanianMunicipality;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
@@ -51,10 +52,6 @@ public class Voter extends BaseEntity {
 
     @Column(nullable = false)
     private String address;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private UserRole role = UserRole.VOTER;
 
     @Column(nullable = false)
     private boolean verified = false;

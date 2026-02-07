@@ -4,7 +4,9 @@ import danjel.votingbackend.dto.AuthResponse;
 import danjel.votingbackend.dto.RegisterRequest;
 import danjel.votingbackend.exception.AuthenticationException;
 import danjel.votingbackend.exception.RegistrationException;
+import danjel.votingbackend.model.Admin;
 import danjel.votingbackend.model.Voter;
+import danjel.votingbackend.repository.AdminRepository;
 import danjel.votingbackend.repository.VoterRepository;
 import danjel.votingbackend.utils.enums.UserRole;
 import org.springframework.context.annotation.Lazy;
@@ -26,15 +28,18 @@ import java.util.Map;
 public class AuthService implements UserDetailsService {
 
     private final VoterRepository voterRepository;
+    private final AdminRepository adminRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
 
     public AuthService(VoterRepository voterRepository,
+                       AdminRepository adminRepository,
                        @Lazy PasswordEncoder passwordEncoder,
                        JwtService jwtService) {
         this.voterRepository = voterRepository;
+        this.adminRepository = adminRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
@@ -51,8 +56,27 @@ public class AuthService implements UserDetailsService {
                 true,
                 true,
                 !voter.isAccountLocked(),
-                Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + voter.getRole().name()))
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_VOTER"))
         );
+    }
+
+    public UserDetails loadUserByUsernameAndType(String email, String userType) throws UsernameNotFoundException {
+        if ("ADMIN".equals(userType)) {
+            Admin admin = adminRepository.findByEmail(email)
+                    .orElseThrow(() -> new UsernameNotFoundException("Admin not found with email: " + email));
+
+            return new User(
+                    admin.getEmail(),
+                    admin.getPasswordHash(),
+                    admin.isEnabled(),
+                    true,
+                    true,
+                    !admin.isAccountLocked(),
+                    Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + admin.getRole().name()))
+            );
+        }
+
+        return loadUserByUsername(email);
     }
 
     @Transactional
@@ -81,7 +105,6 @@ public class AuthService implements UserDetailsService {
                 request.getAddress()
         );
 
-        voter.setRole(UserRole.VOTER);
         voter.setVerified(false);
         voter.setFaceVerified(false);
 
@@ -90,14 +113,17 @@ public class AuthService implements UserDetailsService {
         UserDetails userDetails = loadUserByUsername(voter.getEmail());
         Map<String, Object> extraClaims = createExtraClaims(voter);
 
+        Map<String, Object> refreshClaims = new HashMap<>();
+        refreshClaims.put("userType", "VOTER");
+
         String accessToken = jwtService.generateToken(extraClaims, userDetails);
-        String refreshToken = jwtService.generateRefreshToken(userDetails);
+        String refreshToken = jwtService.generateRefreshToken(refreshClaims, userDetails);
 
         AuthResponse response = AuthResponse.success(accessToken, refreshToken, jwtService.getExpirationTime());
         response.setVoterId(voter.getId());
         response.setEmail(voter.getEmail());
         response.setFullName(voter.getFullName());
-        response.setRole(voter.getRole());
+        response.setRole(UserRole.VOTER);
         response.setVerified(voter.isVerified());
         response.setFaceVerified(voter.isFaceVerified());
 
@@ -123,14 +149,17 @@ public class AuthService implements UserDetailsService {
         UserDetails userDetails = loadUserByUsername(voter.getEmail());
         Map<String, Object> extraClaims = createExtraClaims(voter);
 
+        Map<String, Object> refreshClaims = new HashMap<>();
+        refreshClaims.put("userType", "VOTER");
+
         String accessToken = jwtService.generateToken(extraClaims, userDetails);
-        String refreshToken = jwtService.generateRefreshToken(userDetails);
+        String refreshToken = jwtService.generateRefreshToken(refreshClaims, userDetails);
 
         AuthResponse response = AuthResponse.success(accessToken, refreshToken, jwtService.getExpirationTime());
         response.setVoterId(voter.getId());
         response.setEmail(voter.getEmail());
         response.setFullName(voter.getFullName());
-        response.setRole(voter.getRole());
+        response.setRole(UserRole.VOTER);
         response.setVerified(voter.isVerified());
         response.setFaceVerified(voter.isFaceVerified());
 
@@ -146,8 +175,9 @@ public class AuthService implements UserDetailsService {
 
     private Map<String, Object> createExtraClaims(Voter voter) {
         Map<String, Object> claims = new HashMap<>();
+        claims.put("userType", "VOTER");
         claims.put("voterId", voter.getId());
-        claims.put("role", voter.getRole().name());
+        claims.put("role", UserRole.VOTER.name());
         claims.put("county", voter.getCounty().name());
         claims.put("municipality", voter.getMunicipality().name());
         claims.put("verified", voter.isVerified());
@@ -166,14 +196,18 @@ public class AuthService implements UserDetailsService {
         }
 
         Map<String, Object> extraClaims = createExtraClaims(voter);
+
+        Map<String, Object> refreshClaims = new HashMap<>();
+        refreshClaims.put("userType", "VOTER");
+
         String newAccessToken = jwtService.generateToken(extraClaims, userDetails);
-        String newRefreshToken = jwtService.generateRefreshToken(userDetails);
+        String newRefreshToken = jwtService.generateRefreshToken(refreshClaims, userDetails);
 
         AuthResponse response = AuthResponse.success(newAccessToken, newRefreshToken, jwtService.getExpirationTime());
         response.setVoterId(voter.getId());
         response.setEmail(voter.getEmail());
         response.setFullName(voter.getFullName());
-        response.setRole(voter.getRole());
+        response.setRole(UserRole.VOTER);
         return response;
     }
 

@@ -3,7 +3,6 @@ package danjel.votingbackend.repository;
 import danjel.votingbackend.model.Voter;
 import danjel.votingbackend.utils.enums.AlbanianCounty;
 import danjel.votingbackend.utils.enums.AlbanianMunicipality;
-import danjel.votingbackend.utils.enums.UserRole;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -29,8 +28,6 @@ public interface VoterRepository extends JpaRepository<Voter, String> {
     List<Voter> findByCounty(AlbanianCounty county);
 
     List<Voter> findByMunicipality(AlbanianMunicipality municipality);
-
-    List<Voter> findByRole(UserRole role);
 
     Page<Voter> findByVerifiedTrue(Pageable pageable);
 

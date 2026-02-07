@@ -51,6 +51,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/elections/active").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/elections/*/public").permitAll()
 
+                        // Admin auth endpoints (order matters - before admin wildcard)
+                        .requestMatchers("/api/v1/admin/auth/login").permitAll()
+                        .requestMatchers("/api/v1/admin/auth/refresh").permitAll()
+                        .requestMatchers("/api/v1/admin/auth/register").hasRole("ADMIN")
+
                         // Admin endpoints
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/elections").hasRole("ADMIN")

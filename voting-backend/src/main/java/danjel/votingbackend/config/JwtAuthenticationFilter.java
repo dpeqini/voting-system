@@ -1,4 +1,5 @@
 package danjel.votingbackend.config;
+import danjel.votingbackend.service.AuthService;
 import danjel.votingbackend.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -8,7 +9,6 @@ import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -19,11 +19,11 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final UserDetailsService userDetailsService;
+    private final AuthService authService;
 
-    public JwtAuthenticationFilter(JwtService jwtService, UserDetailsService userDetailsService) {
+    public JwtAuthenticationFilter(JwtService jwtService, AuthService authService) {
         this.jwtService = jwtService;
-        this.userDetailsService = userDetailsService;
+        this.authService = authService;
     }
 
     @Override
@@ -50,7 +50,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // If we have a valid username and no authentication exists yet
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
+                String userType = jwtService.extractUserType(jwt);
+                if (userType == null) {
+                    userType = "VOTER";
+                }
+
+                UserDetails userDetails = authService.loadUserByUsernameAndType(userEmail, userType);
 
                 // Validate token and check if user is not locked
                 if (jwtService.isTokenValid(jwt, userDetails)) {
@@ -77,6 +82,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String path = request.getServletPath();
         return path.startsWith("/api/auth/") ||
                 path.startsWith("/api/public/") ||
-                path.equals("/api/health");
+                path.equals("/api/health") ||
+                path.startsWith("/api/v1/admin/auth/");
     }
 }

@@ -10,20 +10,24 @@ import lombok.Setter;
 import java.time.LocalDate;
 
 /**
- * Sent by the Android app after completing the full on-device verification:
+ * Sent by the Android app to authenticate a voter via biometric ID card.
  *
- *   1. NFC chip read     → all fields below
- *   2. ML Kit liveness   → livenessConfirmed = true
- *   3. DeepFace /verify  → Android calls Python server directly,
- *                          only continues here if verified = true
+ * The Android is responsible for:
+ *   1. NFC chip read  →  all chip fields below + chipFaceImageBase64
+ *   2. ML Kit         →  liveness confirmed on-device + live selfie captured
  *
- * The Java backend receives ONLY chip data.
- * Face comparison is entirely the Android app's responsibility.
- * No images, no DeepFace scores, no face tokens.
+ * The BACKEND is responsible for:
+ *   3. Calling the Python DeepFace server to compare chipFaceImageBase64 vs liveFaceImageBase64
+ *   4. Validating the result and issuing a JWT on success
+ *
+ * Face images travel Android → Backend (HTTPS) → Python (internal).
+ * They never hit the public internet on the second hop.
  */
 @Getter
 @Setter
 public class IdCardAuthRequest {
+
+    // ── Chip identity fields ──────────────────────────────────────────────────
 
     @NotBlank(message = "National ID is required")
     private String nationalId;
@@ -46,14 +50,34 @@ public class IdCardAuthRequest {
     @NotNull(message = "Municipality is required")
     private AlbanianMunicipality municipality;
 
-    /**
-     * The Android app only sends this request if ML Kit liveness passed
-     * AND DeepFace returned verified=true. This flag is a final confirmation.
-     * Backend rejects the request if it is false.
-     */
-    @NotNull(message = "Verification result is required")
-    private Boolean verificationPassed;
+    // ── Biometric images (processed server-side) ──────────────────────────────
 
-    /** Optional: Android device ID for audit logging. */
+    /**
+     * Face photo extracted from the NFC chip's DG2 data group (base64).
+     * This is the government-issued reference photo.
+     */
+    @NotBlank(message = "Chip face image is required")
+    private String chipFaceImageBase64;
+
+    /**
+     * Live selfie captured by the Android camera during the session (base64).
+     * ML Kit liveness check must have passed before this is sent.
+     */
+    @NotBlank(message = "Live face image is required")
+    private String liveFaceImageBase64;
+
+    // ── Liveness confirmation ─────────────────────────────────────────────────
+
+    /**
+     * True if ML Kit Face Detection confirmed the selfie shows a live person.
+     * The backend rejects the request immediately if this is false —
+     * there is no point calling DeepFace if the liveness check failed.
+     */
+    @NotNull(message = "Liveness confirmation is required")
+    private Boolean livenessConfirmed;
+
+    // ── Optional metadata ─────────────────────────────────────────────────────
+
+    /** Android device fingerprint — stored for audit logging only. */
     private String deviceId;
 }

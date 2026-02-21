@@ -11,17 +11,16 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface VoterRepository extends JpaRepository<Voter, String> {
 
-    Optional<Voter> findByEmail(String email);
+    // ── Lookups ───────────────────────────────────────────────────────────────
 
     Optional<Voter> findByNationalId(String nationalId);
-
-    boolean existsByEmail(String email);
 
     boolean existsByNationalId(String nationalId);
 
@@ -29,43 +28,46 @@ public interface VoterRepository extends JpaRepository<Voter, String> {
 
     List<Voter> findByMunicipality(AlbanianMunicipality municipality);
 
-    Page<Voter> findByVerifiedTrue(Pageable pageable);
+    // ── Admin / reporting queries ─────────────────────────────────────────────
 
-    Page<Voter> findByVerifiedFalse(Pageable pageable);
+    Page<Voter> findByEnabledTrue(Pageable pageable);
 
-    @Query("SELECT COUNT(v) FROM Voter v WHERE v.verified = true AND v.enabled = true")
+    Page<Voter> findByEnabledFalse(Pageable pageable);
+
+    @Query("SELECT COUNT(v) FROM Voter v WHERE v.enabled = true")
     long countEligibleVoters();
 
-    @Query("SELECT COUNT(v) FROM Voter v WHERE v.verified = true AND v.enabled = true AND v.county = :county")
+    @Query("SELECT COUNT(v) FROM Voter v WHERE v.enabled = true AND v.county = :county")
     long countEligibleVotersByCounty(@Param("county") AlbanianCounty county);
 
-    @Query("SELECT COUNT(v) FROM Voter v WHERE v.verified = true AND v.enabled = true AND v.municipality = :municipality")
+    @Query("SELECT COUNT(v) FROM Voter v WHERE v.enabled = true AND v.municipality = :municipality")
     long countEligibleVotersByMunicipality(@Param("municipality") AlbanianMunicipality municipality);
 
-    @Query("SELECT v FROM Voter v WHERE v.verified = true AND v.enabled = true AND v.county = :county")
+    @Query("SELECT v FROM Voter v WHERE v.enabled = true AND v.county = :county")
     List<Voter> findEligibleVotersByCounty(@Param("county") AlbanianCounty county);
 
-    @Query("SELECT v FROM Voter v WHERE v.verified = true AND v.enabled = true AND v.municipality = :municipality")
+    @Query("SELECT v FROM Voter v WHERE v.enabled = true AND v.municipality = :municipality")
     List<Voter> findEligibleVotersByMunicipality(@Param("municipality") AlbanianMunicipality municipality);
 
-    @Query("SELECT v FROM Voter v WHERE LOWER(v.firstName) LIKE LOWER(CONCAT('%', :name, '%')) OR LOWER(v.lastName) LIKE LOWER(CONCAT('%', :name, '%'))")
+    @Query("SELECT v FROM Voter v WHERE LOWER(v.firstName) LIKE LOWER(CONCAT('%', :name, '%')) " +
+            "OR LOWER(v.lastName) LIKE LOWER(CONCAT('%', :name, '%'))")
     Page<Voter> searchByName(@Param("name") String name, Pageable pageable);
-
-    @Modifying
-    @Query("UPDATE Voter v SET v.failedLoginAttempts = 0, v.accountLocked = false WHERE v.id = :voterId")
-    void resetLoginAttempts(@Param("voterId") String voterId);
-
-    @Modifying
-    @Query("UPDATE Voter v SET v.failedLoginAttempts = v.failedLoginAttempts + 1 WHERE v.id = :voterId")
-    void incrementFailedLoginAttempts(@Param("voterId") String voterId);
-
-    @Modifying
-    @Query("UPDATE Voter v SET v.accountLocked = true WHERE v.id = :voterId")
-    void lockAccount(@Param("voterId") String voterId);
-
-    @Query("SELECT v FROM Voter v WHERE v.faceVerified = false AND v.verified = true")
-    List<Voter> findVotersPendingFaceVerification();
 
     @Query("SELECT COUNT(v) FROM Voter v WHERE :electionId MEMBER OF v.votedElectionIds")
     long countVotersWhoVotedInElection(@Param("electionId") String electionId);
+
+    // ── Updates ───────────────────────────────────────────────────────────────
+
+    @Modifying
+    @Query("UPDATE Voter v SET v.lastAuthenticatedAt = :ts WHERE v.id = :voterId")
+    void updateLastAuthenticated(@Param("voterId") String voterId,
+                                 @Param("ts") LocalDateTime ts);
+
+    @Modifying
+    @Query("UPDATE Voter v SET v.enabled = false WHERE v.id = :voterId")
+    void disableVoter(@Param("voterId") String voterId);
+
+    @Modifying
+    @Query("UPDATE Voter v SET v.enabled = true WHERE v.id = :voterId")
+    void enableVoter(@Param("voterId") String voterId);
 }

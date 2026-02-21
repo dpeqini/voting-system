@@ -3,9 +3,7 @@ package danjel.votingbackend.controller;
 import danjel.votingbackend.dto.VoteRequest;
 import danjel.votingbackend.dto.VoteResponse;
 import danjel.votingbackend.dto.election.CandidateResponse;
-import danjel.votingbackend.model.Candidate;
-import danjel.votingbackend.model.Voter;
-import danjel.votingbackend.service.AuthService;
+import danjel.votingbackend.service.JwtService;
 import danjel.votingbackend.service.VotingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,16 +13,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/vote")
@@ -33,43 +29,48 @@ import java.util.stream.Collectors;
 public class VotingController {
 
     private final VotingService votingService;
-    private final AuthService authService;
+    private final JwtService    jwtService;
 
-    public VotingController(VotingService votingService, AuthService authService) {
+    public VotingController(VotingService votingService, JwtService jwtService) {
         this.votingService = votingService;
-        this.authService = authService;
+        this.jwtService    = jwtService;
     }
+
+    // ── Cast vote ─────────────────────────────────────────────────────────────
 
     @Operation(
             summary = "Cast a vote",
             description = """
-            Submits a vote for the authenticated voter. Requirements:
-            - Voter must be verified
-            - Election must be active
-            - Voter must not have already voted in this election
-            - Candidate must be from voter's region (county for Parliamentary, municipality for Local Government)
-            """
+                    Submits a vote for the authenticated voter.
+                    Requirements:
+                    - Valid JWT (issued after ID card + face verification)
+                    - Election must be active
+                    - Voter must not have already voted in this election
+                    - Candidate must be from voter's region
+                      (county for Parliamentary, municipality for Local Government)
+                    """
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Vote cast successfully",
                     content = @Content(schema = @Schema(implementation = VoteResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid vote request or voter not eligible"),
+            @ApiResponse(responseCode = "400", description = "Invalid vote or voter not eligible"),
             @ApiResponse(responseCode = "401", description = "Not authenticated"),
             @ApiResponse(responseCode = "409", description = "Already voted in this election")
     })
     @PostMapping
     public ResponseEntity<VoteResponse> castVote(
-            @AuthenticationPrincipal UserDetails userDetails,
+            HttpServletRequest httpRequest,
             @Valid @RequestBody VoteRequest request) {
 
-        Voter voter = authService.getCurrentVoter(userDetails.getUsername());
-        VoteResponse response = votingService.castVote(voter.getId(), request);
-        return ResponseEntity.ok(response);
+        String voterId = extractVoterId(httpRequest);
+        return ResponseEntity.ok(votingService.castVote(voterId, request));
     }
+
+    // ── Get candidates ────────────────────────────────────────────────────────
 
     @Operation(
             summary = "Get candidates for voter",
-            description = "Returns candidates available for the authenticated voter based on their region and the election type"
+            description = "Returns candidates filtered to the voter's county or municipality"
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "List of available candidates"),
@@ -78,21 +79,18 @@ public class VotingController {
     })
     @GetMapping("/candidates/{electionId}")
     public ResponseEntity<List<CandidateResponse>> getCandidatesForVoter(
-            @AuthenticationPrincipal UserDetails userDetails,
+            HttpServletRequest httpRequest,
             @Parameter(description = "Election ID") @PathVariable String electionId) {
 
-        Voter voter = authService.getCurrentVoter(userDetails.getUsername());
-        List<CandidateResponse> candidates = votingService.getCandidatesForVoter(voter.getId(), electionId)
-                .stream()
-                .map(this::mapCandidateToResponse)
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(candidates);
+        String voterId = extractVoterId(httpRequest);
+        return ResponseEntity.ok(votingService.getCandidatesForVoter(voterId, electionId));
     }
+
+    // ── Vote status ───────────────────────────────────────────────────────────
 
     @Operation(
             summary = "Check vote status",
-            description = "Checks if the authenticated voter has already voted in the specified election"
+            description = "Returns whether the authenticated voter has already voted in the given election"
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Vote status retrieved"),
@@ -100,54 +98,39 @@ public class VotingController {
     })
     @GetMapping("/status/{electionId}")
     public ResponseEntity<VoteStatusResponse> getVoteStatus(
-            @AuthenticationPrincipal UserDetails userDetails,
+            HttpServletRequest httpRequest,
             @Parameter(description = "Election ID") @PathVariable String electionId) {
 
-        Voter voter = authService.getCurrentVoter(userDetails.getUsername());
-        boolean hasVoted = votingService.hasVoted(voter.getId(), electionId);
+        String voterId   = extractVoterId(httpRequest);
+        boolean hasVoted = votingService.hasVoted(voterId, electionId);
 
         VoteStatusResponse response = new VoteStatusResponse();
         response.setElectionId(electionId);
         response.setHasVoted(hasVoted);
-        response.setVoterId(voter.getId());
-
+        response.setVoterId(voterId);
         return ResponseEntity.ok(response);
     }
 
-    private CandidateResponse mapCandidateToResponse(Candidate candidate) {
-        CandidateResponse response = new CandidateResponse();
-        response.setId(candidate.getId());
-        response.setFirstName(candidate.getFirstName());
-        response.setLastName(candidate.getLastName());
-        response.setFullName(candidate.getFullName());
-        response.setBiography(candidate.getBiography());
-        response.setPhotoUrl(candidate.getPhotoUrl());
-        response.setCounty(candidate.getCounty());
-        response.setCountyName(candidate.getCounty() != null ? candidate.getCounty().getDisplayName() : null);
-        response.setMunicipality(candidate.getMunicipality());
-        response.setMunicipalityName(candidate.getMunicipality() != null ? candidate.getMunicipality().getDisplayName() : null);
-        response.setPositionInList(candidate.getPositionInList());
-        response.setIndependent(candidate.isIndependent());
-        response.setProfession(candidate.getProfession());
-        response.setAge(candidate.getAge());
-        response.setEducation(candidate.getEducation());
-        response.setPlatform(candidate.getPlatform());
+    // ── JWT helper ────────────────────────────────────────────────────────────
 
-        if (candidate.getParty() != null) {
-            response.setPartyId(candidate.getParty().getId());
-            response.setPartyName(candidate.getParty().getName());
-            response.setPartyCode(candidate.getParty().getPartyCode());
-        }
-
-        return response;
+    /**
+     * Extracts the voterId claim from the Bearer JWT.
+     * Avoids an extra DB round-trip — the voter's DB uuid is embedded in the
+     * token by IdCardAuthService at issue time.
+     * The filter has already validated the token before we get here.
+     */
+    private String extractVoterId(HttpServletRequest request) {
+        String token = request.getHeader("Authorization").substring(7);
+        return jwtService.extractVoterId(token);
     }
 
-    @Setter
-    @Getter
-    public static class VoteStatusResponse {
-        private String electionId;
-        private String voterId;
-        private boolean hasVoted;
+    // ── Inner DTO ─────────────────────────────────────────────────────────────
 
+    @Getter
+    @Setter
+    public static class VoteStatusResponse {
+        private String  electionId;
+        private String  voterId;
+        private boolean hasVoted;
     }
 }

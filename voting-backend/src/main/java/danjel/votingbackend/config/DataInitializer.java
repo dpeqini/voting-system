@@ -51,25 +51,7 @@ public class DataInitializer {
                 logger.info("Election official user created: official@voting.albania.gov");
             }
 
-            // Create sample voter for testing (development only)
-            if (!voterRepository.existsByEmail("voter@example.com")) {
-                Voter testVoter = new Voter();
-                testVoter.setNationalId("I12345678A");
-                testVoter.setFirstName("Test");
-                testVoter.setLastName("Voter");
-                testVoter.setEmail("voter@example.com");
-                testVoter.setPasswordHash(passwordEncoder.encode("Voter@2024!"));
-                testVoter.setDateOfBirth(LocalDate.of(1990, 3, 20));
-                testVoter.setCounty(AlbanianCounty.TIRANE);
-                testVoter.setMunicipality(AlbanianMunicipality.TIRANE);
-                testVoter.setAddress("Rruga e Kavajes, Tirana");
-                testVoter.setVerified(true);
-                testVoter.setFaceVerified(false);
-                testVoter.setEnabled(true);
 
-                voterRepository.save(testVoter);
-                logger.info("Test voter created: voter@example.com");
-            }
 
             logger.info("Database initialization completed");
         };

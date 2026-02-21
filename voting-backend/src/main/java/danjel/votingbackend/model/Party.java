@@ -10,14 +10,24 @@ import java.util.List;
 @Setter
 @Getter
 @Entity
-@Table(name = "election_party", indexes = {
-        @Index(name = "idx_party_code", columnList = "partyCode", unique = true),
-        @Index(name = "idx_party_external_id", columnList = "externalId")
-})
+@Table(
+        name = "election_party",
+        indexes = {
+                @Index(name = "idx_party_external_id", columnList = "externalId")
+        },
+        // partyCode is unique PER election, not globally
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_party_code_election",
+                        columnNames = {"partyCode", "election_id"})
+        }
+)
 public class Party extends BaseEntity {
 
-    // Getters and Setters
-    @Column(nullable = false, unique = true)
+    /**
+     * Short political party code (e.g. "PS", "PD").
+     * Unique within an election; the same code can reappear in future elections.
+     */
+    @Column(nullable = false)
     private String partyCode;
 
     @Column(nullable = false)
@@ -38,12 +48,12 @@ public class Party extends BaseEntity {
     @Column
     private String externalId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "election_id", nullable = false)
+    private Election election;
+
     @OneToMany(mappedBy = "party", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Candidate> candidates = new ArrayList<>();
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "election_id")
-    private Election election;
 
     @Column(nullable = false)
     private boolean active = true;
@@ -51,13 +61,16 @@ public class Party extends BaseEntity {
     @Column
     private int listNumber;
 
-    // Constructors
+    // ── Constructors ──────────────────────────────────────────────────────────
+
     public Party() {}
 
     public Party(String partyCode, String name) {
         this.partyCode = partyCode;
-        this.name = name;
+        this.name      = name;
     }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     public void addCandidate(Candidate candidate) {
         candidates.add(candidate);

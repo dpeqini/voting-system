@@ -1,10 +1,13 @@
 package danjel.votingbackend.config;
+
 import danjel.votingbackend.service.AuthService;
 import danjel.votingbackend.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,63 +18,71 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+/**
+ * Validates the Bearer JWT on every request and populates the SecurityContext.
+ *
+ * JWT subject semantics (must match what IdCardAuthService and AdminAuthService put in):
+ *   Voter JWT  → subject = nationalId,  userType claim = "VOTER"
+ *   Admin JWT  → subject = email,       userType claim = "ADMIN"
+ *
+ * AuthService.loadUserByUsernameAndType() handles both cases correctly.
+ */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private final JwtService jwtService;
+    private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+
+    private final JwtService  jwtService;
     private final AuthService authService;
 
     public JwtAuthenticationFilter(JwtService jwtService, AuthService authService) {
-        this.jwtService = jwtService;
+        this.jwtService  = jwtService;
         this.authService = authService;
     }
 
     @Override
     protected void doFilterInternal(
-            @NonNull HttpServletRequest request,
+            @NonNull HttpServletRequest  request,
             @NonNull HttpServletResponse response,
-            @NonNull FilterChain filterChain
+            @NonNull FilterChain         filterChain
     ) throws ServletException, IOException {
 
         final String authHeader = request.getHeader("Authorization");
-        final String jwt;
-        final String userEmail;
 
-        // Check if Authorization header is present and starts with "Bearer "
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        jwt = authHeader.substring(7);
+        final String jwt = authHeader.substring(7);
 
         try {
-            userEmail = jwtService.extractUsername(jwt);
+            // For voters: jwtSubject = nationalId
+            // For admins: jwtSubject = email
+            final String jwtSubject = jwtService.extractUsername(jwt);
 
-            // If we have a valid username and no authentication exists yet
-            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            if (jwtSubject != null
+                    && SecurityContextHolder.getContext().getAuthentication() == null) {
+
                 String userType = jwtService.extractUserType(jwt);
-                if (userType == null) {
-                    userType = "VOTER";
-                }
+                if (userType == null) userType = "VOTER";
 
-                UserDetails userDetails = authService.loadUserByUsernameAndType(userEmail, userType);
+                UserDetails userDetails = authService.loadUserByUsernameAndType(jwtSubject, userType);
 
-                // Validate token and check if user is not locked
                 if (jwtService.isTokenValid(jwt, userDetails)) {
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
-                    );
-
-                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    UsernamePasswordAuthenticationToken authToken =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    userDetails.getAuthorities()
+                            );
+                    authToken.setDetails(
+                            new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
         } catch (Exception e) {
-            // Token is invalid or expired - continue without authentication
-            logger.warn("JWT validation failed: " + e.getMessage());
+            logger.warn("JWT validation failed: {}", e.getMessage());
         }
 
         filterChain.doFilter(request, response);
@@ -80,9 +91,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
-        return path.startsWith("/api/auth/") ||
-                path.startsWith("/api/public/") ||
-                path.equals("/api/health") ||
-                path.startsWith("/api/v1/admin/auth/");
+        // Must match the permitAll() rules in SecurityConfig exactly
+        return path.startsWith("/api/v1/auth/")
+                || path.startsWith("/api/v1/public/")
+                || path.startsWith("/api/v1/admin/auth/login")
+                || path.startsWith("/api/v1/admin/auth/refresh")
+                || path.equals("/api/v1/health")
+                || path.startsWith("/v3/api-docs")
+                || path.startsWith("/swagger-ui");
     }
 }

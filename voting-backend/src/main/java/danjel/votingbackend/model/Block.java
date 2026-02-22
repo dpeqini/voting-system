@@ -27,13 +27,13 @@ public class Block extends BaseEntity {
     @Column(nullable = false)
     private LocalDateTime timestamp;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 64)
     private String blockHash;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 64)
     private String previousHash;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 64)
     private String merkleRoot;
 
     @Column(nullable = false)

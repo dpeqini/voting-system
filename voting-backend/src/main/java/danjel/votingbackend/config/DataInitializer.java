@@ -29,7 +29,7 @@ public class DataInitializer {
                 admin.setFirstName("System");
                 admin.setLastName("Administrator");
                 admin.setEmail("admin@voting.albania.gov");
-                admin.setPasswordHash(passwordEncoder.encode("Admin@2024!Secure"));
+                admin.setPasswordHash(passwordEncoder.encode("password"));
                 admin.setRole(AdminRole.ADMIN);
                 admin.setEnabled(true);
 

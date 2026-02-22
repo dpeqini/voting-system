@@ -165,7 +165,7 @@ public class ElectionController {
     )
     @GetMapping("/{electionId}")
     public ResponseEntity<ElectionResponse> getElection(
-            @Parameter(description = "Election ID") @PathVariable String electionId) {
+            @Parameter(description = "Election ID") @PathVariable("electionId") String electionId) {
         ElectionResponse response = electionService.getElection(electionId);
         return ResponseEntity.ok(response);
     }

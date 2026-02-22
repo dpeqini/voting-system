@@ -2,6 +2,7 @@ package danjel.votingbackend.controller;
 
 import danjel.votingbackend.dto.AuthResponse;
 import danjel.votingbackend.dto.IdCardAuthRequest;
+import danjel.votingbackend.security.DeviceSecretRegistry;
 import danjel.votingbackend.service.AuthService;
 import danjel.votingbackend.service.IdCardAuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,9 +12,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -22,10 +26,12 @@ public class AuthController {
 
     private final IdCardAuthService idCardAuthService;
     private final AuthService       authService;
+    private final DeviceSecretRegistry deviceSecretRegistry;
 
-    public AuthController(IdCardAuthService idCardAuthService, AuthService authService) {
+    public AuthController(IdCardAuthService idCardAuthService, AuthService authService, DeviceSecretRegistry deviceSecretRegistry) {
         this.idCardAuthService = idCardAuthService;
         this.authService       = authService;
+        this.deviceSecretRegistry = deviceSecretRegistry;
     }
 
     /**
@@ -78,8 +84,16 @@ public class AuthController {
     })
     @PostMapping("/id-card")
     public ResponseEntity<AuthResponse> authenticateWithIdCard(
-            @Valid @RequestBody IdCardAuthRequest request) {
+            @Valid @RequestBody IdCardAuthRequest request,
+            HttpServletRequest httpRequest) {
         AuthResponse response = idCardAuthService.authenticateWithIdCard(request);
+        String deviceId = httpRequest.getHeader("X-Device-ID");
+        byte[] deviceSecret = java.util.Base64.getDecoder()
+                .decode(httpRequest.getHeader("X-Device-Secret"));
+
+        if (deviceId != null && deviceSecret != null && deviceSecret.length >= 32) {
+            deviceSecretRegistry.registerDevice(deviceId, UUID.fromString(response.getVoterId()), deviceSecret);
+        }
         return ResponseEntity.ok(response);
     }
 

@@ -8,7 +8,9 @@ import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Setter
 @Getter
@@ -49,13 +51,13 @@ public class Election extends BaseEntity {
     private LocalDateTime registrationDeadline;
 
     @OneToMany(mappedBy = "election", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Candidate> candidates = new ArrayList<>();
+    private Set<Candidate> candidates = new HashSet<>();
 
     @OneToMany(mappedBy = "election", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Party> parties = new ArrayList<>();
+    private Set<Party> parties = new HashSet<>();
 
     @OneToMany(mappedBy = "election", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Vote> votes = new ArrayList<>();
+    private Set<Vote> votes = new HashSet<>();
 
     @Column
     private String blockchainContractAddress;

@@ -47,6 +47,9 @@ public class Voter extends BaseEntity {
     @Column(nullable = false)
     private String lastName;
 
+    @Column(columnDefinition = "TEXT")
+    private String publicKey;
+
     @Column(nullable = false)
     private LocalDate dateOfBirth;
 
@@ -97,7 +100,7 @@ public class Voter extends BaseEntity {
 
     public Voter(String nationalId, String firstName, String lastName,
                  LocalDate dateOfBirth, LocalDate cardExpiryDate,
-                 AlbanianCounty county, AlbanianMunicipality municipality) {
+                 AlbanianCounty county, AlbanianMunicipality municipality, String publicKey) {
         this.nationalId     = nationalId;
         this.firstName      = firstName;
         this.lastName       = lastName;
@@ -105,6 +108,7 @@ public class Voter extends BaseEntity {
         this.cardExpiryDate = cardExpiryDate;
         this.county         = county;
         this.municipality   = municipality;
+        this.publicKey     = publicKey;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

@@ -218,7 +218,7 @@ public class ElectionService {
     }
 
     public List<PartyResponse> getPartiesForElection(String electionId) {
-        return partyRepository.findActivePartiesByElection(electionId)
+        return partyRepository.findPartiesWithCandidates(electionId)
                 .stream()
                 .map(this::mapPartyToResponse)
                 .collect(Collectors.toList());
@@ -279,6 +279,17 @@ public class ElectionService {
         return response;
     }
 
+    private CandidateResponse mapSimpleCandidate(Candidate candidate) {
+        CandidateResponse response = new CandidateResponse();
+        response.setId(candidate.getId());
+        response.setFirstName(candidate.getFirstName());
+        response.setLastName(candidate.getLastName());
+        response.setFullName(candidate.getFullName());
+        response.setCounty(candidate.getCounty());
+        response.setMunicipality(candidate.getMunicipality());
+
+        return response;
+    }
     private PartyResponse mapPartyToResponse(Party party) {
         PartyResponse response = new PartyResponse();
         response.setId(party.getId());
@@ -290,6 +301,7 @@ public class ElectionService {
         response.setLeader(party.getLeader());
         response.setListNumber(party.getListNumber());
         response.setCandidateCount((int) candidateRepository.countByParty(party.getId()));
+        response.setCandidates(party.getCandidates().stream().map(this::mapSimpleCandidate).collect(Collectors.toList()));
         return response;
     }
 }

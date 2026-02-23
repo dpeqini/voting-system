@@ -1,5 +1,6 @@
 package danjel.votingbackend.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import danjel.votingbackend.utils.enums.AlbanianCounty;
 import danjel.votingbackend.utils.enums.AlbanianMunicipality;
 import jakarta.validation.constraints.NotBlank;
@@ -33,38 +34,37 @@ public class IdCardAuthRequest {
     private String nationalId;
 
     @NotBlank(message = "First name is required")
-    private String firstName;
-
-    @NotBlank(message = "Last name is required")
-    private String lastName;
+    private String name;
 
     @NotNull(message = "Date of birth is required")
+    @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate dateOfBirth;
 
     @NotNull(message = "Card expiry date is required")
-    private LocalDate cardExpiryDate;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate expiryDate;
 
-    @NotNull(message = "County is required")
     private AlbanianCounty county;
 
     @NotNull(message = "Municipality is required")
     private AlbanianMunicipality municipality;
 
     // ── Biometric images (processed server-side) ──────────────────────────────
-
+    @NotBlank(message = "Device public key is required")
+    private String devicePublicKey; // Base64 encoded public key
     /**
      * Face photo extracted from the NFC chip's DG2 data group (base64).
      * This is the government-issued reference photo.
      */
     @NotBlank(message = "Chip face image is required")
-    private String chipFaceImageBase64;
+    private String chipFacePhoto;
 
     /**
      * Live selfie captured by the Android camera during the session (base64).
      * ML Kit liveness check must have passed before this is sent.
      */
     @NotBlank(message = "Live face image is required")
-    private String liveFaceImageBase64;
+    private String liveSelfie;
 
     // ── Liveness confirmation ─────────────────────────────────────────────────
 

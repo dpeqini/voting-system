@@ -16,12 +16,14 @@ import danjel.votingbackend.repository.VoteRepository;
 import danjel.votingbackend.repository.VoterRepository;
 import danjel.votingbackend.utils.enums.ElectionStatus;
 import danjel.votingbackend.utils.enums.ElectionType;
+import jakarta.annotation.PreDestroy;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.security.*;
+import java.security.spec.X509EncodedKeySpec;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
@@ -30,7 +32,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class VotingService {
-
+    @Value("${voting.secret.salt}")
+    private String secretSalt;
     private final VoteRepository      voteRepository;
     private final VoterRepository     voterRepository;
     private final ElectionRepository  electionRepository;
@@ -67,6 +70,8 @@ public class VotingService {
         // So here we only check account-level flags and card validity.
         validateVoterEligibility(voter);
 
+        //  Verify the cryptographic RSA signature before accepting the vote
+        verifyVoterSignature(request, voter);
         // ── 3. Load & validate election ────────────────────────────────────────
         Election election = electionRepository.findById(request.getElectionId())
                 .orElseThrow(() -> new VotingException("Election not found"));
@@ -132,6 +137,7 @@ public class VotingService {
         return buildVoteResponse(saved);
     }
 
+
     // ── Validation ─────────────────────────────────────────────────────────────
 
     private void validateVoterEligibility(Voter voter) {
@@ -180,7 +186,43 @@ public class VotingService {
             }
         }
     }
+    private void verifyVoterSignature(VoteRequest request, Voter voter) {
+        if (voter.getPublicKey() == null || voter.getPublicKey().isBlank()) {
+            throw new VotingException("No public key registered for this device. Please re-authenticate.");
+        }
 
+        try {
+            // A. Reconstruct the exact string the phone signed
+            String candidateId = (request.getCandidateId() != null && !request.getCandidateId().isBlank())
+                    ? request.getCandidateId() : "NONE";
+            String partyId = (request.getPartyId() != null && !request.getPartyId().isBlank())
+                    ? request.getPartyId() : "NONE";
+
+            String payloadToSign = request.getElectionId() + ":" + candidateId + ":" + partyId;
+
+            // B. Decode the voter's registered Public Key
+            byte[] keyBytes = Base64.getDecoder().decode(voter.getPublicKey());
+            X509EncodedKeySpec spec = new X509EncodedKeySpec(keyBytes);
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+            PublicKey publicKey = kf.generatePublic(spec);
+
+            // C. Verify the signature
+            Signature sig = Signature.getInstance("SHA256withRSA");
+            sig.initVerify(publicKey);
+            sig.update(payloadToSign.getBytes(StandardCharsets.UTF_8));
+
+            byte[] signatureBytes = Base64.getDecoder().decode(request.getDigitalSignature());
+            boolean isValid = sig.verify(signatureBytes);
+
+            if (!isValid) {
+                throw new VotingException("Cryptographic signature verification failed. Vote payload was tampered with.");
+            }
+        } catch (VotingException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new VotingException("Invalid signature format or keys: " + e.getMessage());
+        }
+    }
     // ── Candidates ──────────────────────────────────────────────────────────────
 
     public List<CandidateResponse> getCandidatesForVoter(String voterId, String electionId) {
@@ -191,13 +233,14 @@ public class VotingService {
 
         List<Candidate> candidates;
         if (election.getElectionType() == ElectionType.PARLIAMENTARY) {
-            candidates = candidateRepository.findByElectionAndCounty(electionId, voter.getCounty());
+            candidates = candidateRepository.findByElectionIdAndCountyWithParty(electionId, voter.getCounty());
         } else {
-            candidates = candidateRepository.findByElectionAndMunicipality(electionId, voter.getMunicipality());
+            candidates = candidateRepository.findByElectionIdAndMunicipalityWithParty(electionId, voter.getMunicipality());
         }
         return candidates.stream().map(this::mapCandidateToResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public boolean hasVoted(String voterId, String electionId) {
         return voterRepository.findById(voterId)
                 .map(v -> v.hasVotedIn(electionId))
@@ -209,14 +252,13 @@ public class VotingService {
     private String generateVoterHash(String voterId, String electionId) {
         try {
             MessageDigest d = MessageDigest.getInstance("SHA-256");
-            byte[] hash = d.digest((voterId + ":" + electionId + ":salt")
+            byte[] hash = d.digest((voterId + ":" + electionId + ":" + secretSalt)
                     .getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(hash);
         } catch (NoSuchAlgorithmException e) {
             throw new VotingException("Failed to generate voter hash");
         }
     }
-
     private String generateVoteHash(VoteRequest request, String voterHash) {
         try {
             MessageDigest d = MessageDigest.getInstance("SHA-256");

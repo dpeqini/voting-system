@@ -27,10 +27,10 @@ public class Block extends BaseEntity {
     @Column(nullable = false)
     private LocalDateTime timestamp;
 
-    @Column(nullable = false, unique = true, length = 64)
+    @Column(nullable = false, unique = true, length = 2048)
     private String blockHash;
 
-    @Column(nullable = false, length = 64)
+    @Column(nullable = false, length = 2048)
     private String previousHash;
 
     @Column(nullable = false, length = 64)
@@ -57,7 +57,7 @@ public class Block extends BaseEntity {
     @Column
     private LocalDateTime validatedAt;
 
-    @Column
+    @Column( length = 2048)
     private String validatorSignature;
 
     @Column(nullable = false)
@@ -70,7 +70,7 @@ public class Block extends BaseEntity {
         this.blockNumber = blockNumber;
         this.previousHash = previousHash;
         this.election = election;
-        this.timestamp = LocalDateTime.now();
+        this.timestamp = LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS); // ← ADD
         this.nonce = 0L;
         this.difficulty = 4;
     }

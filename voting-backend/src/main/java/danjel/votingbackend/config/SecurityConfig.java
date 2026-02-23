@@ -91,7 +91,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",
-                "http://localhost:8080",
+                "http://localhost:8081",
                 "http://localhost:4200",
                 "https://voting.albania.gov"
         ));

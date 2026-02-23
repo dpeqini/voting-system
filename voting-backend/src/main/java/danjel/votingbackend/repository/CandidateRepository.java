@@ -25,7 +25,16 @@ public interface CandidateRepository extends JpaRepository<Candidate, String> {
     List<Candidate> findByCounty(AlbanianCounty county);
 
     List<Candidate> findByMunicipality(AlbanianMunicipality municipality);
+    // Add this to CandidateRepository
+    @Query("SELECT c FROM Candidate c LEFT JOIN FETCH c.party WHERE c.election.id = :electionId AND c.county = :county")
+    List<Candidate> findByElectionIdAndCountyWithParty(
+            @Param("electionId") String electionId,
+            @Param("county") AlbanianCounty county);
 
+    @Query("SELECT c FROM Candidate c LEFT JOIN FETCH c.party WHERE c.election.id = :electionId AND c.municipality = :municipality")
+    List<Candidate> findByElectionIdAndMunicipalityWithParty(
+            @Param("electionId") String electionId,
+            @Param("municipality") AlbanianMunicipality municipality);
     @Query("SELECT c FROM Candidate c WHERE c.election.id = :electionId AND c.county = :county AND c.active = true ORDER BY c.party.listNumber, c.positionInList")
     List<Candidate> findByElectionAndCounty(@Param("electionId") String electionId,
                                             @Param("county") AlbanianCounty county);

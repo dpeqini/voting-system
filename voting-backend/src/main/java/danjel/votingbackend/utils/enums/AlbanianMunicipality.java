@@ -1,5 +1,9 @@
 package danjel.votingbackend.utils.enums;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+
+import java.util.Arrays;
+
 public enum AlbanianMunicipality {
     // Berat County
     BERAT("Berat", AlbanianCounty.BERAT),
@@ -31,7 +35,7 @@ public enum AlbanianMunicipality {
     // Fier County
     DIVJAKE("Divjakë", AlbanianCounty.FIER),
     FIER("Fier", AlbanianCounty.FIER),
-    LUSHNJE("Lushnjë", AlbanianCounty.FIER),
+    LUSHNJE("Lushnje", AlbanianCounty.FIER),
     MALLAKASTER("Mallakastër", AlbanianCounty.FIER),
     PATOS("Patos", AlbanianCounty.FIER),
     ROSKOVEC("Roskovec", AlbanianCounty.FIER),
@@ -84,11 +88,20 @@ public enum AlbanianMunicipality {
     KONISPOL("Konispol", AlbanianCounty.VLORE),
     SARANDE("Sarandë", AlbanianCounty.VLORE),
     SELENICE("Selenicë", AlbanianCounty.VLORE),
-    VLORE("Vlorë", AlbanianCounty.VLORE);
+    VLORE("Vlorë", AlbanianCounty.VLORE),
 
+    OTHER("Tjeter", AlbanianCounty.TIRANE);
     private final String displayName;
     private final AlbanianCounty county;
 
+    @JsonCreator
+    public static AlbanianMunicipality fromString(String value) {
+        if (value == null) return null;
+        return Arrays.stream(AlbanianMunicipality.values())
+                .filter(m -> m.name().equalsIgnoreCase(value) || m.displayName.equalsIgnoreCase(value))
+                .findFirst()
+                .orElse(AlbanianMunicipality.OTHER);
+    }
     AlbanianMunicipality(String displayName, AlbanianCounty county) {
         this.displayName = displayName;
         this.county = county;

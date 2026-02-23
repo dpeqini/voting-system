@@ -6,6 +6,8 @@ import danjel.votingbackend.exception.AuthenticationException;
 import danjel.votingbackend.exception.FaceVerificationException;
 import danjel.votingbackend.model.Voter;
 import danjel.votingbackend.repository.VoterRepository;
+import danjel.votingbackend.utils.enums.AlbanianCounty;
+import danjel.votingbackend.utils.enums.AlbanianMunicipality;
 import danjel.votingbackend.utils.enums.UserRole;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,8 +95,8 @@ public class IdCardAuthService {
         //    DeepFaceClient throws DeepFaceUnavailableException if server is down,
         //    FaceVerificationException if images are bad or no face detected.
         DeepFaceClient.DeepFaceResult faceResult = deepFaceClient.verify(
-                request.getChipFaceImageBase64(),
-                request.getLiveFaceImageBase64()
+                request.getChipFacePhoto(),
+                request.getLiveSelfie()
         );
 
         // ── 5. Handle face match result ───────────────────────────────────────
@@ -158,9 +160,9 @@ public class IdCardAuthService {
                     "You must be at least 18 years old to vote.");
         }
 
-        if (req.getCardExpiryDate().isBefore(LocalDate.now())) {
+        if (req.getExpiryDate().isBefore(LocalDate.now())) {
             throw new AuthenticationException(
-                    "Your ID card expired on " + req.getCardExpiryDate() +
+                    "Your ID card expired on " + req.getExpiryDate() +
                             ". Please renew it before voting.");
         }
 
@@ -222,14 +224,18 @@ public class IdCardAuthService {
     // ── Voter lifecycle ───────────────────────────────────────────────────────
 
     private Voter createFromChip(IdCardAuthRequest req) {
+        String[] nameParts = req.getName().split(" ");
+        String firstName = nameParts[0];
+        String lastName = nameParts[1];
         Voter voter = new Voter(
                 req.getNationalId(),
-                req.getFirstName(),
-                req.getLastName(),
+                firstName,
+                lastName,
                 req.getDateOfBirth(),
-                req.getCardExpiryDate(),
-                req.getCounty(),
-                req.getMunicipality()
+                req.getExpiryDate(),
+                req.getMunicipality().getCounty(),
+                req.getMunicipality(),
+                req.getDevicePublicKey()
         );
         Voter saved = voterRepository.save(voter);
         logger.info("New voter registered  nationalId={}  name={}  county={}",
@@ -246,12 +252,12 @@ public class IdCardAuthService {
     private Voter syncFromChip(Voter existing, IdCardAuthRequest req) {
         boolean changed = false;
 
-        if (req.getCardExpiryDate() != null &&
-                !req.getCardExpiryDate().equals(existing.getCardExpiryDate())) {
-            existing.setCardExpiryDate(req.getCardExpiryDate());
+        if (req.getExpiryDate() != null &&
+                !req.getExpiryDate().equals(existing.getCardExpiryDate())) {
+            existing.setCardExpiryDate(req.getExpiryDate());
             changed = true;
         }
-        if (!req.getCounty().equals(existing.getCounty())) {
+        if (!req.getMunicipality().getCounty().equals(existing.getCounty())) {
             existing.setCounty(req.getCounty());
             changed = true;
         }
@@ -283,7 +289,7 @@ public class IdCardAuthService {
         claims.put("userType",     "VOTER");
         claims.put("voterId",      voter.getId());
         claims.put("role",         UserRole.VOTER.name());
-        claims.put("county",       voter.getCounty().name());
+        claims.put("county",       voter.getMunicipality().getCounty());
         claims.put("municipality", voter.getMunicipality().name());
         claims.put("fullName",     voter.getFullName());
         // Audit trail — face match distance is embedded in JWT for traceability

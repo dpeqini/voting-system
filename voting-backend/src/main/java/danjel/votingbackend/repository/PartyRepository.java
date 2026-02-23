@@ -22,7 +22,7 @@ public interface PartyRepository extends JpaRepository<Party, String> {
 
     Optional<Party> findByElectionIdAndPartyCode(String electionId, String partyCode);
 
-    @Query("SELECT p FROM Party p WHERE p.election.id = :electionId AND p.active = true ORDER BY p.listNumber")
+    @Query("SELECT p FROM Party p join Candidate WHERE p.election.id = :electionId AND p.active = true ORDER BY p.listNumber")
     List<Party> findActivePartiesByElection(@Param("electionId") String electionId);
 
     @Query("SELECT p FROM Party p LEFT JOIN FETCH p.candidates WHERE p.election.id = :electionId AND p.active = true ORDER BY p.listNumber")

@@ -9,6 +9,7 @@ import danjel.votingbackend.model.Vote;
 import danjel.votingbackend.repository.BlockRepository;
 import danjel.votingbackend.repository.ElectionRepository;
 import danjel.votingbackend.repository.VoteRepository;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
@@ -131,6 +132,7 @@ public class BlockchainService {
                 election);
 
         List<String> voteHashes = new ArrayList<>();
+
         for (Vote vote : votesToProcess) {
             voteHashes.add(vote.getVoteHash());
             newBlock.addVoteHash(vote.getVoteHash());
@@ -239,20 +241,29 @@ public class BlockchainService {
 
         Block previousBlock = null;
         for (Block block : blocks) {
+            // 1. Check the chain link
             if (previousBlock != null &&
                     !block.getPreviousHash().equals(previousBlock.getBlockHash())) {
-                logger.error("Chain broken at block {}", block.getBlockNumber());
+                logger.error("Chain broken at block {} (Previous Hash mismatch)", block.getBlockNumber());
                 return false;
             }
+
+            // 2. Check the block's internal hash integrity
             if (!calculateBlockHash(block).equals(block.getBlockHash())) {
-                logger.error("Hash mismatch at block {}", block.getBlockNumber());
+                logger.error("Hash mismatch at block {} (Data has been tampered with)", block.getBlockNumber());
                 return false;
             }
+
+            // 3. NEW: Verify the RSA cryptographic signature
+            if (!verifySignature(block.getBlockHash(), block.getValidatorSignature())) {
+                logger.error("Forged signature detected at block {}! (Admin tampering suspected)", block.getBlockNumber());
+                return false;
+            }
+
             previousBlock = block;
         }
         return true;
     }
-
     // ── Stats ─────────────────────────────────────────────────────────────────
 
     public long getBlockCount(String electionId) {
@@ -270,7 +281,21 @@ public class BlockchainService {
             processBlock(electionId);
         }
     }
+    private boolean verifySignature(String blockHash, String signatureBase64) {
+        try {
+            if (signatureBase64 == null || signatureBase64.isEmpty()) return false;
 
+            Signature sig = Signature.getInstance(blockchainConfig.getSignatureAlgorithm());
+            sig.initVerify(serverKeyPair.getPublic());
+            sig.update(blockHash.getBytes(StandardCharsets.UTF_8));
+
+            byte[] signatureBytes = Base64.getDecoder().decode(signatureBase64);
+            return sig.verify(signatureBytes);
+        } catch (Exception e) {
+            logger.error("Failed to verify block signature: {}", e.getMessage());
+            return false;
+        }
+    }
     // ── Mining / hashing / crypto ─────────────────────────────────────────────
 
     private String mineBlock(Block block) {
@@ -284,14 +309,20 @@ public class BlockchainService {
         } while (!hash.startsWith(prefix));
         return hash;
     }
-
+    @PreDestroy
+    public void onShutdown() {
+        logger.info("Shutting down: Flushing all pending votes to blockchain...");
+        for (String electionId : pendingVotes.keySet()) {
+            flushPendingVotes(electionId);
+        }
+    }
     private String calculateBlockHash(Block block) {
         try {
             MessageDigest digest = MessageDigest.getInstance(blockchainConfig.getHashAlgorithm());
             String input = block.getBlockNumber()
                     + block.getPreviousHash()
                     + block.getMerkleRoot()
-                    + block.getTimestamp().toString()
+                    + block.getTimestamp().toInstant(java.time.ZoneOffset.UTC).toEpochMilli()  // ← FIXED
                     + block.getNonce();
             return bytesToHex(digest.digest(input.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {
@@ -318,29 +349,39 @@ public class BlockchainService {
     private String generateMerkleProof(Block block, String voteHash) {
         List<String> voteHashes = block.getVoteHashes();
         int index = voteHashes.indexOf(voteHash);
+
+        // If the vote isn't in this block, return null
         if (index == -1) return null;
 
         StringBuilder proof = new StringBuilder();
         List<String> currentLevel = new ArrayList<>(voteHashes);
 
         while (currentLevel.size() > 1) {
-            int siblingIndex = (index % 2 == 0) ? index + 1 : index - 1;
+            boolean isLeftNode = (index % 2 == 0);
+            int siblingIndex = isLeftNode ? index + 1 : index - 1;
+
             if (siblingIndex < currentLevel.size()) {
-                proof.append(currentLevel.get(siblingIndex)).append(";");
+                // If the target is Left, the sibling is Right.
+                // If the target is Right, the sibling is Left.
+                String direction = isLeftNode ? "R:" : "L:";
+                proof.append(direction).append(currentLevel.get(siblingIndex)).append(";");
             }
 
+            // Move up to the next level of the Merkle Tree
             List<String> next = new ArrayList<>();
             for (int i = 0; i < currentLevel.size(); i += 2) {
-                String left  = currentLevel.get(i);
+                String left = currentLevel.get(i);
                 String right = (i + 1 < currentLevel.size()) ? currentLevel.get(i + 1) : left;
+                // Your hash() method already exists in your class
                 next.add(hash(left + right));
             }
-            index = index / 2;
+
+            index = index / 2; // Target's index in the parent level
             currentLevel = next;
         }
+
         return proof.toString();
     }
-
     private String hash(String input) {
         try {
             MessageDigest digest = MessageDigest.getInstance(blockchainConfig.getHashAlgorithm());

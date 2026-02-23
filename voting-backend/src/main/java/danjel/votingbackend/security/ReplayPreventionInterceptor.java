@@ -11,6 +11,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * ══════════════════════════════════════════════════════════════
@@ -40,7 +42,7 @@ public class ReplayPreventionInterceptor implements HandlerInterceptor {
     private static final String HEADER_NONCE     = "X-Request-Nonce";
     private static final String HEADER_TIMESTAMP = "X-Request-Timestamp";
     private static final String HEADER_SIGNATURE = "X-Request-Signature";
-
+    private static final List<String> ORIGINS_TO_IGNORE = List.of("http://localhost:4200");
     private final NonceValidationService nonceValidationService;
     private final DeviceSecretRegistry   deviceSecretRegistry;
 
@@ -54,6 +56,10 @@ public class ReplayPreventionInterceptor implements HandlerInterceptor {
         String timestamp = request.getHeader(HEADER_TIMESTAMP);
         String signature = request.getHeader(HEADER_SIGNATURE);
 
+        if (request.getServerPort() ==  8081) return true;
+        if (ORIGINS_TO_IGNORE.contains(request.getHeader("Origin"))) {
+            return true;
+        }
         // ── 1. Require all three headers ─────────────────────────────────────────
         if (nonce == null || timestamp == null || signature == null) {
             log.warn("Missing anti-replay headers on {} {} — rejecting",

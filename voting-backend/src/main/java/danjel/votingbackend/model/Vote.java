@@ -51,27 +51,27 @@ public class Vote extends BaseEntity {
      * SHA-256(voterId + electionId + salt) — links the ballot to a voter
      * without exposing the voter's identity.
      */
-    @Column(nullable = false)
+    @Column(nullable = false, length = 2048)
     private String voterHash;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 2048)
     private String encryptedVoteData;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 2048)
     private String voteHash;
 
     // ── Blockchain anchoring ──────────────────────────────────────────────────
 
-    @Column
+    @Column(length = 2048)
     private String blockchainTransactionId;
 
     @Column
     private Long blockNumber;
 
-    @Column
+    @Column( length = 2048)
     private String previousBlockHash;
 
-    @Column
+    @Column( length = 2048)
     private String currentBlockHash;
 
     // ── Metadata ──────────────────────────────────────────────────────────────
@@ -85,7 +85,7 @@ public class Vote extends BaseEntity {
     @Column
     private LocalDateTime verifiedAt;
 
-    @Column
+    @Column(length = 2048)
     private String verificationProof;
 
     @Enumerated(EnumType.STRING)
@@ -102,7 +102,7 @@ public class Vote extends BaseEntity {
     @Column
     private String encryptedMetadata;
 
-    @Column
+    @Column(length = 2048)
     private String digitalSignature;
 
     @Column

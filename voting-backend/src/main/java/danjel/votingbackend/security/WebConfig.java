@@ -28,8 +28,9 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addInterceptor(replayPreventionInterceptor)
                 // Protected paths — all authentication and voting endpoints
                 .addPathPatterns(
-                        "/api/v1/auth/**",
+                        "/api/v1/auth/id-card",
                         "/api/v1/vote/**",
+                        "/api/v1/verification/**",
                         "/api/v1/elections/**"
                 )
                 // Allow CORS preflight through without anti-replay headers

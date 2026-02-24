@@ -160,7 +160,7 @@ public class NonceValidationService {
             Mac mac = Mac.getInstance(HMAC_ALGORITHM);
             mac.init(new SecretKeySpec(secret, HMAC_ALGORITHM));
             byte[] rawMac = mac.doFinal(message.getBytes(StandardCharsets.UTF_8));
-            return Base64.getEncoder().withoutPadding().encodeToString(rawMac);
+            return Base64.getEncoder().encodeToString(rawMac);
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             throw new IllegalStateException("HMAC-SHA256 not available", e);
         }

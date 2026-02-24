@@ -76,8 +76,11 @@ public class IdCardAuthService {
     }
 
     @Transactional
-    public AuthResponse authenticateWithIdCard(IdCardAuthRequest request) {
+    public AuthResponse authenticateWithIdCard(IdCardAuthRequest request, String deviceId) {
 
+        if (deviceId == null || deviceId.isBlank()) {
+            throw new AuthenticationException("Missing X-Device-ID");
+        }
         // ── 1. Liveness check must pass before we do anything else ───────────
         if (Boolean.FALSE.equals(request.getLivenessConfirmed())) {
             throw new FaceVerificationException(
@@ -134,9 +137,9 @@ public class IdCardAuthService {
 
         // ── 8. Issue JWT ──────────────────────────────────────────────────────
         UserDetails userDetails = buildUserDetails(voter);
-        String accessToken  = jwtService.generateToken(buildClaims(voter, faceResult), userDetails);
+        String accessToken  = jwtService.generateToken(buildClaims(voter, faceResult, deviceId), userDetails);
         String refreshToken = jwtService.generateRefreshToken(
-                Map.of("userType", "VOTER"), userDetails);
+                Map.of("userType", "VOTER", "deviceId", deviceId), userDetails);
 
         AuthResponse response = AuthResponse.success(
                 accessToken, refreshToken, jwtService.getExpirationTime());
@@ -284,16 +287,17 @@ public class IdCardAuthService {
         );
     }
 
-    private Map<String, Object> buildClaims(Voter voter, DeepFaceClient.DeepFaceResult faceResult) {
+    private Map<String, Object> buildClaims(Voter voter, DeepFaceClient.DeepFaceResult faceResult, String deviceId) {
         Map<String, Object> claims = new HashMap<>();
-        claims.put("userType",     "VOTER");
-        claims.put("voterId",      voter.getId());
-        claims.put("role",         UserRole.VOTER.name());
-        claims.put("county",       voter.getMunicipality().getCounty());
+        claims.put("userType", "VOTER");
+        claims.put("voterId", voter.getId().toString());
+        claims.put("role", UserRole.VOTER.name());
+        claims.put("county", voter.getMunicipality().getCounty().name());
         claims.put("municipality", voter.getMunicipality().name());
-        claims.put("fullName",     voter.getFullName());
-        // Audit trail — face match distance is embedded in JWT for traceability
+        claims.put("fullName", voter.getFullName());
         claims.put("faceDistance", faceResult.distance());
+        claims.put("deviceId", deviceId);
+
         return claims;
     }
 

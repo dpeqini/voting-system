@@ -56,8 +56,7 @@ public class ReplayPreventionInterceptor implements HandlerInterceptor {
         String timestamp = request.getHeader(HEADER_TIMESTAMP);
         String signature = request.getHeader(HEADER_SIGNATURE);
 
-        if (request.getServerPort() ==  8081) return true;
-        if (ORIGINS_TO_IGNORE.contains(request.getHeader("Origin"))) {
+        if (request.getHeader("Origin") != null && ORIGINS_TO_IGNORE.contains(request.getHeader("Origin"))) {
             return true;
         }
         // ── 1. Require all three headers ─────────────────────────────────────────
@@ -92,6 +91,7 @@ public class ReplayPreventionInterceptor implements HandlerInterceptor {
             return false;
         }
 
+        log.info("Replay success prevention triggered on {} {}: {}", request.getMethod(), path, nonce);
         return true;  // all checks passed — continue to controller
     }
 

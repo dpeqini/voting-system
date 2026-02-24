@@ -1,5 +1,6 @@
 package danjel.votingbackend.config;
 
+import danjel.votingbackend.security.DeviceBoundJwtFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -81,7 +82,8 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(deviceBoundJwtFilter(), JwtAuthenticationFilter.class);
 
         return http.build();
     }
@@ -102,12 +104,18 @@ public class SecurityConfig {
                 "X-Requested-With",
                 "Accept",
                 "Origin",
-                "X-Face-Verification-Token"
+                "X-Face-Verification-Token",
+                "X-Device-ID",
+                "X-Device-Secret",
+                "X-Request-Signature",
+                "X-Request-Nonce",
+                "X-Request-Timestamp"
         ));
         configuration.setExposedHeaders(Arrays.asList(
                 "Authorization",
                 "X-Token-Expiry",
                 "X-Vote-Receipt"
+
         ));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
@@ -124,7 +132,10 @@ public class SecurityConfig {
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }
-
+    @Bean
+    public DeviceBoundJwtFilter deviceBoundJwtFilter() {
+        return new DeviceBoundJwtFilter();
+    }
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();

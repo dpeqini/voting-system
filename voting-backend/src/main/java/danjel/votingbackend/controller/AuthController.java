@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
+
 @RestController
 @RequestMapping("/api/v1/auth")
 @Tag(name = "Authentication", description = "Voter authentication via biometric ID card")
@@ -86,14 +87,29 @@ public class AuthController {
     public ResponseEntity<AuthResponse> authenticateWithIdCard(
             @Valid @RequestBody IdCardAuthRequest request,
             HttpServletRequest httpRequest) {
-        AuthResponse response = idCardAuthService.authenticateWithIdCard(request);
-        String deviceId = httpRequest.getHeader("X-Device-ID");
-        byte[] deviceSecret = java.util.Base64.getDecoder()
-                .decode(httpRequest.getHeader("X-Device-Secret"));
+        final String deviceId = httpRequest.getHeader("X-Device-ID");
+        final String deviceSecretB64 = httpRequest.getHeader("X-Device-Secret");
 
-        if (deviceId != null && deviceSecret != null && deviceSecret.length >= 32) {
-            deviceSecretRegistry.registerDevice(deviceId, UUID.fromString(response.getVoterId()), deviceSecret);
+        if (deviceId == null || deviceId.isBlank()) {
+            return ResponseEntity.badRequest().body(AuthResponse.failure("Missing X-Device-ID header"));
         }
+        if (deviceSecretB64 == null || deviceSecretB64.isBlank()) {
+            return ResponseEntity.badRequest().body(AuthResponse.failure("Missing X-Device-Secret header"));
+        }
+
+        byte[] deviceSecret;
+        try {
+            deviceSecret = java.util.Base64.getDecoder().decode(deviceSecretB64);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(AuthResponse.failure("Invalid Base64 in X-Device-Secret"));
+        }
+
+        AuthResponse response = idCardAuthService.authenticateWithIdCard(request, deviceId);
+        try {
+            UUID voterUuid = UUID.fromString(response.getVoterId());
+            deviceSecretRegistry.registerDevice(deviceId, voterUuid, deviceSecret);
+        } catch (Exception ignored) {}
+
         return ResponseEntity.ok(response);
     }
 
@@ -110,13 +126,14 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refreshToken(
             @Parameter(description = "Refresh token — format: Bearer <token>")
-            @RequestHeader("Authorization") String authHeader) {
+            @RequestHeader("Authorization") String authHeader,
+            @RequestHeader("X-Device-ID") String deviceId) {
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.badRequest()
                     .body(AuthResponse.failure("Authorization header must be: Bearer <token>"));
         }
-        return ResponseEntity.ok(authService.refreshToken(authHeader.substring(7)));
+        return ResponseEntity.ok(authService.refreshToken(authHeader.substring(7), deviceId));
     }
 
     @Operation(

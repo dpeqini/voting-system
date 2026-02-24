@@ -1,5 +1,6 @@
 package danjel.votingbackend.config;
 
+import danjel.votingbackend.security.JwtAuthenticationToken;
 import danjel.votingbackend.service.AuthService;
 import danjel.votingbackend.service.JwtService;
 import jakarta.servlet.FilterChain;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.UUID;
 
 /**
  * Validates the Bearer JWT on every request and populates the SecurityContext.
@@ -70,14 +72,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 UserDetails userDetails = authService.loadUserByUsernameAndType(jwtSubject, userType);
 
                 if (jwtService.isTokenValid(jwt, userDetails)) {
-                    UsernamePasswordAuthenticationToken authToken =
-                            new UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities()
-                            );
-                    authToken.setDetails(
-                            new WebAuthenticationDetailsSource().buildDetails(request));
+
+                    // Extract voter token fields (safe even if null)
+                    String voterIdStr = jwtService.extractVoterId(jwt);
+                    String role = jwtService.extractRole(jwt);
+                    String county = jwtService.extractCounty(jwt);
+                    String municipality = jwtService.extractMunicipality(jwt);
+
+                    // ✅ Extract deviceId (for binding)
+                    String deviceId = jwtService.extractDeviceId(jwt);
+
+                    UUID voterId = null;
+                    try {
+                        if (voterIdStr != null) voterId = UUID.fromString(voterIdStr);
+                    } catch (Exception ignored) {}
+
+                    JwtAuthenticationToken authToken = JwtAuthenticationToken.fromClaims(
+                            jwtSubject,
+                            voterId,
+                            role,
+                            county,
+                            municipality,
+                            deviceId
+                    );
+
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }

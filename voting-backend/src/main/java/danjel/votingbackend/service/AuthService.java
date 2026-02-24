@@ -102,7 +102,7 @@ public class AuthService implements UserDetailsService {
      * Issues a new access token from a valid refresh token.
      * Works for both voters (subject = nationalId) and admins (subject = email).
      */
-    public AuthResponse refreshToken(String refreshToken) {
+    public AuthResponse refreshToken(String refreshToken, String deviceId) {
         String subject  = jwtService.extractUsername(refreshToken);
         String userType = jwtService.extractUserType(refreshToken);
         if (userType == null) userType = "VOTER";
@@ -129,6 +129,7 @@ public class AuthService implements UserDetailsService {
             claims.put("county",       voter.getCounty().name());
             claims.put("municipality", voter.getMunicipality().name());
             claims.put("fullName",     voter.getFullName());
+            claims.put("deviceId",     deviceId);
 
             String newToken = jwtService.generateToken(claims, userDetails);
             AuthResponse response = AuthResponse.success(

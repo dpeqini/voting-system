@@ -31,9 +31,9 @@ public class JwtService {
         return extractClaim(token, Claims::getSubject);
     }
 
-    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
-        final Claims claims = extractAllClaims(token);
-        return claimsResolver.apply(claims);
+    public <T> T extractClaim(String token, Function<Claims, T> resolver) {
+        Claims claims = extractAllClaims(token);
+        return resolver.apply(claims);
     }
 
     public String generateToken(UserDetails userDetails) {
@@ -45,34 +45,72 @@ public class JwtService {
     }
 
     public String generateRefreshToken(UserDetails userDetails) {
-        return buildToken(new HashMap<>(), userDetails, refreshExpiration);
+        return generateRefreshToken(new HashMap<>(), userDetails);
     }
 
     public String generateRefreshToken(Map<String, Object> extraClaims, UserDetails userDetails) {
         return buildToken(extraClaims, userDetails, refreshExpiration);
     }
 
-    private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails, long expiration) {
+    private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails, long expirationMs) {
         return Jwts.builder()
                 .setClaims(extraClaims)
                 .setSubject(userDetails.getUsername())
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .setExpiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(getSignInKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
-        final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+        String username = extractUsername(token);
+        return username != null
+                && username.equals(userDetails.getUsername())
+                && !isTokenExpired(token);
     }
+
+    public long getExpirationTime() {
+        return jwtExpiration;
+    }
+
+    // ── Existing helpers ─────────────────────────────────────────────
+
+    public String extractUserType(String token) {
+        Object val = extractClaim(token, c -> c.get("userType"));
+        return val == null ? null : String.valueOf(val);
+    }
+
+    public String extractVoterId(String token) {
+        Object val = extractClaim(token, c -> c.get("voterId"));
+        return val == null ? null : String.valueOf(val);
+    }
+
+    public String extractRole(String token) {
+        Object val = extractClaim(token, c -> c.get("role"));
+        return val == null ? null : String.valueOf(val);
+    }
+
+    public String extractCounty(String token) {
+        Object val = extractClaim(token, c -> c.get("county"));
+        return val == null ? null : String.valueOf(val);
+    }
+
+    public String extractMunicipality(String token) {
+        Object val = extractClaim(token, c -> c.get("municipality"));
+        return val == null ? null : String.valueOf(val);
+    }
+
+    // ✅ NEW: deviceId claim extractor
+    public String extractDeviceId(String token) {
+        Object val = extractClaim(token, c -> c.get("deviceId"));
+        return val == null ? null : String.valueOf(val);
+    }
+
+    // ── Internals ────────────────────────────────────────────────────
 
     private boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
-    }
-
-    private Date extractExpiration(String token) {
-        return extractClaim(token, Claims::getExpiration);
+        Date exp = extractClaim(token, Claims::getExpiration);
+        return exp.before(new Date());
     }
 
     private Claims extractAllClaims(String token) {
@@ -84,23 +122,7 @@ public class JwtService {
     }
 
     private Key getSignInKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
-        return Keys.hmacShaKeyFor(keyBytes);
-    }
-
-    public long getExpirationTime() {
-        return jwtExpiration;
-    }
-
-    public String extractUserType(String token) {
-        return extractClaim(token, claims -> claims.get("userType", String.class));
-    }
-
-    public String extractVoterId(String token) {
-        return extractClaim(token, claims -> claims.get("voterId", String.class));
-    }
-
-    public String extractRole(String token) {
-        return extractClaim(token, claims -> claims.get("role", String.class));
+        byte[] bytes = Decoders.BASE64.decode(secretKey);
+        return Keys.hmacShaKeyFor(bytes);
     }
 }

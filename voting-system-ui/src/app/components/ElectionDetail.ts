@@ -8,12 +8,17 @@ import {
   input,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import {ELECTION_STATUS_LABELS, ELECTION_TYPE_LABELS, ElectionResponse, ElectionStatus} from '../core/interfaces';
-import {ElectionService} from '../core/services/election.service';
-
+import {
+  ELECTION_STATUS_LABELS,
+  ELECTION_TYPE_LABELS,
+  ElectionResponse,
+  ElectionStatus
+} from '../core/interfaces';
+import { ElectionService } from '../core/services/election.service';
 
 @Component({
   selector: 'app-election-detail',
+  standalone: true,
   imports: [RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -55,16 +60,20 @@ import {ElectionService} from '../core/services/election.service';
                   }
                   {{ statusLabel() }}
                 </span>
+
                 <span class="px-3 py-1 bg-slate-800 border border-slate-700 rounded-full text-xs text-slate-400">
                   {{ typeLabel() }}
                 </span>
               </div>
+
               <h1 class="text-2xl font-bold text-white truncate" style="font-family: 'Georgia', serif;">
                 {{ election()!.name }}
               </h1>
+
               @if (election()!.description) {
                 <p class="text-slate-400 text-sm mt-2 leading-relaxed">{{ election()!.description }}</p>
               }
+
               <p class="text-slate-500 text-xs mt-3">
                 Created {{ formatDate(election()!.createdAt) }}
               </p>
@@ -72,6 +81,13 @@ import {ElectionService} from '../core/services/election.service';
 
             <!-- Action buttons -->
             <div class="flex items-center gap-2 flex-wrap shrink-0">
+
+              <!-- ✅ NEW: View Results button -->
+              <a [routerLink]="['/results', election()!.id]"
+                 class="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-white text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500">
+                📊 Shiko rezultatet
+              </a>
+
               @if (election()!.status === 'CREATED') {
                 <button (click)="importCandidates()"
                         [disabled]="actionLoading()"
@@ -85,6 +101,7 @@ import {ElectionService} from '../core/services/election.service';
                   Import Candidates
                 </button>
               }
+
               @if (election()!.status === 'CANDIDATES_IMPORTED') {
                 <button (click)="startElection()"
                         [disabled]="actionLoading()"
@@ -98,6 +115,7 @@ import {ElectionService} from '../core/services/election.service';
                   🚀 Start Election
                 </button>
               }
+
               @if (election()!.status === 'STARTED') {
                 @if (confirmClose()) {
                   <div class="flex items-center gap-2">
@@ -232,7 +250,9 @@ import {ElectionService} from '../core/services/election.service';
                   </div>
                   <div class="min-w-0">
                     <p class="text-sm font-medium text-white truncate">{{ party.name }}</p>
-                    <p class="text-xs text-slate-400">{{ party.candidateCount }} candidates{{ party.leader ? ' · ' + party.leader : '' }}</p>
+                    <p class="text-xs text-slate-400">
+                      {{ party.candidateCount }} candidates{{ party.leader ? ' · ' + party.leader : '' }}
+                    </p>
                   </div>
                 </div>
               }

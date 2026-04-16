@@ -49,6 +49,12 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./components/Verification').then((m) => m.VerificationComponent),
       },
+        {
+          path: 'results/:electionId',
+          loadComponent: () =>
+            import('./components/ElectionResults')
+              .then(m => m.ElectionResultsComponent)
+        },
     ],
   },
   { path: '**', redirectTo: 'login' },

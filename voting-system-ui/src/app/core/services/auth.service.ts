@@ -16,9 +16,12 @@ export class AuthService {
   private platformId = inject(PLATFORM_ID);
   private isBrowser = isPlatformBrowser(this.platformId);
 
-  currentUser = signal<AdminAuthResponse | null>(this.loadUser());
+  currentUser = signal<AdminAuthResponse | null>(null);
   isAuthenticated = computed(() => !!this.currentUser());
   isAdmin = computed(() => this.currentUser()?.role === 'ADMIN');
+  constructor() {
+    this.currentUser.set(this.loadUser())
+  }
 
   private loadUser(): AdminAuthResponse | null {
     if (!this.isBrowser) return null;

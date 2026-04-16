@@ -113,7 +113,7 @@ public class ElectionController {
     public ResponseEntity<ElectionResponse> closeElection(
             @Parameter(description = "Election ID") @PathVariable String electionId,
             @AuthenticationPrincipal UserDetails userDetails) {
-        ElectionResponse response = electionService.closeElection(electionId, userDetails.getUsername());
+        ElectionResponse response = electionService.closeElection(electionId, "test");
         return ResponseEntity.ok(response);
     }
 

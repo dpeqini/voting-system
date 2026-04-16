@@ -82,7 +82,7 @@ public class VotingService {
             throw new VotingException("You have already voted in this election");
         }
         String voterHash = generateVoterHash(voterId, election.getId());
-        if (voteRepository.existsByVoterHashAndElectionId(voterHash, election.getId())) {
+        if (voteRepository.existsByVoterHashAndElection_Id(voterHash, election.getId())) {
             throw new VotingException("Duplicate vote detected");
         }
 

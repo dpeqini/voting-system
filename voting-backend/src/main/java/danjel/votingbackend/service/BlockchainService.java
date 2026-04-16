@@ -172,6 +172,7 @@ public class BlockchainService {
      * GET /verification/blockchain/{electionId}/validate (admin/audit use).
      * We still check that the vote's own stored block hash is internally consistent.
      */
+    @Transactional
     public VerificationResponse verifyVote(String voteHash) {
         Vote vote = voteRepository.findByVoteHash(voteHash).orElse(null);
         if (vote == null) {
@@ -188,6 +189,7 @@ public class BlockchainService {
      * It is distinct from the voteHash — it lets the voter confirm their vote
      * without needing to know or store the longer voteHash.
      */
+    @Transactional
     public VerificationResponse verifyVoteByReceipt(String receiptToken) {
         Vote vote = voteRepository.findByReceiptToken(receiptToken).orElse(null);
         if (vote == null) {
@@ -201,7 +203,8 @@ public class BlockchainService {
      * Attaches block info and Merkle proof when the vote has been mined into a block.
      * Does NOT run full chain validation (see verifyVote for rationale).
      */
-    private VerificationResponse buildVerificationResponse(Vote vote) {
+    @Transactional
+    public VerificationResponse buildVerificationResponse(Vote vote) {
         VerificationResponse response = VerificationResponse.success(
                 vote.getVoteHash(),
                 vote.getBlockchainTransactionId(),

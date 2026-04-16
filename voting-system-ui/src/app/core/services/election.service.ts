@@ -65,7 +65,7 @@ export class ElectionService {
   }
 
   verifyVote(voteHash: string): Observable<VerificationResponse> {
-    return this.http.get<VerificationResponse>(`${API}/verification/vote/${voteHash}`);
+    return this.http.get<VerificationResponse>(`${API}/verification/vote/hash?hash=${voteHash}`);
   }
 
   verifyByReceipt(receiptToken: string): Observable<VerificationResponse> {

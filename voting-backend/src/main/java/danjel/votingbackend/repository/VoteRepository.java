@@ -1,5 +1,7 @@
 package danjel.votingbackend.repository;
 
+import danjel.votingbackend.dto.CandidateResultDto;
+import danjel.votingbackend.dto.PartyResultDto;
 import danjel.votingbackend.model.Vote;
 import danjel.votingbackend.utils.enums.AlbanianCounty;
 import danjel.votingbackend.utils.enums.AlbanianMunicipality;
@@ -17,69 +19,31 @@ import java.util.Optional;
 @Repository
 public interface VoteRepository extends JpaRepository<Vote, String> {
 
-    List<Vote> findByElectionId(String electionId);
+    // Nëse Vote ka: private Election election;
+    List<Vote> findByElection_Id(String electionId);
+    Page<Vote> findByElection_Id(String electionId, Pageable pageable);
 
-    Page<Vote> findByElectionId(String electionId, Pageable pageable);
-
-    Optional<Vote> findByVoteHash(String voteHash);
-
+    @Query("SELECT v from Vote v join v.election where v.voteHash = :voteHash")
+    Optional<Vote> findByVoteHash(@Param("voteHash") String voteHash);
     Optional<Vote> findByReceiptToken(String receiptToken);
-
     Optional<Vote> findByBlockchainTransactionId(String transactionId);
 
-    boolean existsByVoterHashAndElectionId(String voterHash, String electionId);
+    boolean existsByVoterHashAndElection_Id(String voterHash, String electionId);
 
-    // ── Aggregate counts ──────────────────────────────────────────────────────
+    // ── Totals ─────────────────────────────────────────────────────────────
 
     @Query("SELECT COUNT(v) FROM Vote v WHERE v.election.id = :electionId")
-    long countByElection(@Param("electionId") String electionId);
+    long countVotesByElection(@Param("electionId") String electionId);
 
     @Query("SELECT COUNT(v) FROM Vote v WHERE v.election.id = :electionId AND v.county = :county")
-    long countByElectionAndCounty(@Param("electionId") String electionId,
-                                  @Param("county") AlbanianCounty county);
+    long countVotesByElectionAndCounty(@Param("electionId") String electionId,
+                                       @Param("county") AlbanianCounty county);
 
     @Query("SELECT COUNT(v) FROM Vote v WHERE v.election.id = :electionId AND v.municipality = :municipality")
-    long countByElectionAndMunicipality(@Param("electionId") String electionId,
-                                        @Param("municipality") AlbanianMunicipality municipality);
+    long countVotesByElectionAndMunicipality(@Param("electionId") String electionId,
+                                             @Param("municipality") AlbanianMunicipality municipality);
 
-    /**
-     * Count votes per candidate — uses FK relation (v.candidate.id).
-     */
-    @Query("SELECT COUNT(v) FROM Vote v WHERE v.election.id = :electionId AND v.candidate.id = :candidateId")
-    long countByCandidateInElection(@Param("electionId") String electionId,
-                                    @Param("candidateId") String candidateId);
-
-    /**
-     * Count votes per party — uses FK relation (v.party.id).
-     */
-    @Query("SELECT COUNT(v) FROM Vote v WHERE v.election.id = :electionId AND v.party.id = :partyId")
-    long countByPartyInElection(@Param("electionId") String electionId,
-                                @Param("partyId") String partyId);
-
-    /**
-     * Aggregate results: candidate id → vote count, ordered by votes desc.
-     * Useful for building election results.
-     */
-    @Query("""
-            SELECT v.candidate.id, COUNT(v)
-            FROM Vote v
-            WHERE v.election.id = :electionId AND v.candidate IS NOT NULL
-            GROUP BY v.candidate.id
-            ORDER BY COUNT(v) DESC
-            """)
-    List<Object[]> countVotesByCandidateInElection(@Param("electionId") String electionId);
-
-    /**
-     * Aggregate results: party id → vote count, ordered by votes desc.
-     */
-    @Query("""
-            SELECT v.party.id, COUNT(v)
-            FROM Vote v
-            WHERE v.election.id = :electionId AND v.party IS NOT NULL
-            GROUP BY v.party.id
-            ORDER BY COUNT(v) DESC
-            """)
-    List<Object[]> countVotesByPartyInElection(@Param("electionId") String electionId);
+    // ── Misc ───────────────────────────────────────────────────────────────
 
     @Query("SELECT v FROM Vote v WHERE v.election.id = :electionId AND v.verified = false")
     List<Vote> findUnverifiedVotes(@Param("electionId") String electionId);
@@ -89,9 +53,149 @@ public interface VoteRepository extends JpaRepository<Vote, String> {
                                           @Param("start") LocalDateTime start,
                                           @Param("end") LocalDateTime end);
 
-    /**
-     * Find a block's votes by their hashes — used for Merkle-proof lookups.
-     */
     @Query("SELECT v FROM Vote v WHERE v.voteHash IN :hashes")
     List<Vote> findByVoteHashes(@Param("hashes") List<String> hashes);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // RESULTS — BY CANDIDATE
+    // CandidateResultDto(Long, String, String, String, String, Long)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // PARLIAMENTARY (region = COUNTY)
+    @Query("""
+            SELECT new danjel.votingbackend.dto.CandidateResultDto(
+                c.id,
+                CONCAT(c.firstName, ' ', c.lastName),
+                p.name,
+                p.partyCode,
+                CONCAT('', v.county),
+                COUNT(v)
+            )
+            FROM Vote v
+            JOIN v.candidate c
+            LEFT JOIN c.party p
+            WHERE v.election.id = :electionId
+              AND v.candidate IS NOT NULL
+            GROUP BY c.id, c.firstName, c.lastName, p.id, p.name, p.partyCode, v.county
+            ORDER BY COUNT(v) DESC
+            """)
+    List<CandidateResultDto> findCandidateResults(@Param("electionId") String electionId);
+
+    // PARLIAMENTARY filtered by county
+    @Query("""
+            SELECT new danjel.votingbackend.dto.CandidateResultDto(
+                c.id,
+                CONCAT(c.firstName, ' ', c.lastName),
+                p.name,
+                p.partyCode,
+                CONCAT('', v.county),
+                COUNT(v)
+            )
+            FROM Vote v
+            JOIN v.candidate c
+            LEFT JOIN c.party p
+            WHERE v.election.id = :electionId
+              AND v.county = :county
+              AND v.candidate IS NOT NULL
+            GROUP BY c.id, c.firstName, c.lastName, p.id, p.name, p.partyCode, v.county
+            ORDER BY COUNT(v) DESC
+            """)
+    List<CandidateResultDto> findCandidateResultsByCounty(@Param("electionId") String electionId,
+                                                          @Param("county") AlbanianCounty county);
+
+    // LOCAL_GOVERNMENT (region = MUNICIPALITY) — pa filter
+    @Query("""
+            SELECT new danjel.votingbackend.dto.CandidateResultDto(
+                c.id,
+                CONCAT(c.firstName, ' ', c.lastName),
+                p.name,
+                p.partyCode,
+                CONCAT('', v.municipality),
+                COUNT(v)
+            )
+            FROM Vote v
+            JOIN v.candidate c
+            LEFT JOIN c.party p
+            WHERE v.election.id = :electionId
+              AND v.candidate IS NOT NULL
+            GROUP BY c.id, c.firstName, c.lastName, p.id, p.name, p.partyCode, v.municipality
+            ORDER BY COUNT(v) DESC
+            """)
+    List<CandidateResultDto> findCandidateResultsLocal(@Param("electionId") String electionId);
+
+    // LOCAL_GOVERNMENT filtered by municipality
+    @Query("""
+            SELECT new danjel.votingbackend.dto.CandidateResultDto(
+                c.id,
+                CONCAT(c.firstName, ' ', c.lastName),
+                p.name,
+                p.partyCode,
+                CONCAT('', v.municipality),
+                COUNT(v)
+            )
+            FROM Vote v
+            JOIN v.candidate c
+            LEFT JOIN c.party p
+            WHERE v.election.id = :electionId
+              AND v.municipality = :municipality
+              AND v.candidate IS NOT NULL
+            GROUP BY c.id, c.firstName, c.lastName, p.id, p.name, p.partyCode, v.municipality
+            ORDER BY COUNT(v) DESC
+            """)
+    List<CandidateResultDto> findCandidateResultsByMunicipality(@Param("electionId") String electionId,
+                                                                @Param("municipality") AlbanianMunicipality municipality);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // RESULTS — BY PARTY
+    // PartyResultDto(Long, String, String, Long)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    @Query("""
+            SELECT new danjel.votingbackend.dto.PartyResultDto(
+                p.id,
+                p.name,
+                p.partyCode,
+                COUNT(v)
+            )
+            FROM Vote v
+            JOIN v.party p
+            WHERE v.election.id = :electionId
+            GROUP BY p.id, p.name, p.partyCode
+            ORDER BY COUNT(v) DESC
+            """)
+    List<PartyResultDto> findPartyResults(@Param("electionId") String electionId);
+
+    @Query("""
+            SELECT new danjel.votingbackend.dto.PartyResultDto(
+                p.id,
+                p.name,
+                p.partyCode,
+                COUNT(v)
+            )
+            FROM Vote v
+            JOIN v.party p
+            WHERE v.election.id = :electionId
+              AND v.county = :county
+            GROUP BY p.id, p.name, p.partyCode
+            ORDER BY COUNT(v) DESC
+            """)
+    List<PartyResultDto> findPartyResultsByCounty(@Param("electionId") String electionId,
+                                                  @Param("county") AlbanianCounty county);
+
+    @Query("""
+            SELECT new danjel.votingbackend.dto.PartyResultDto(
+                p.id,
+                p.name,
+                p.partyCode,
+                COUNT(v)
+            )
+            FROM Vote v
+            JOIN v.party p
+            WHERE v.election.id = :electionId
+              AND v.municipality = :municipality
+            GROUP BY p.id, p.name, p.partyCode
+            ORDER BY COUNT(v) DESC
+            """)
+    List<PartyResultDto> findPartyResultsByMunicipality(@Param("electionId") String electionId,
+                                                        @Param("municipality") AlbanianMunicipality municipality);
 }

@@ -49,10 +49,10 @@ public class VerificationController {
             @ApiResponse(responseCode = "200", description = "Vote verification result"),
             @ApiResponse(responseCode = "404", description = "Vote not found")
     })
-    @GetMapping("/vote/{voteHash}")
+    @GetMapping("/vote/hash")
     public ResponseEntity<VerificationResponse> verifyVote(
             @Parameter(description = "Vote hash from the receipt screen")
-            @PathVariable String voteHash) {
+            @RequestParam("hash") String voteHash) {
         return ResponseEntity.ok(blockchainService.verifyVote(voteHash));
     }
 

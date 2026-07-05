@@ -39,6 +39,16 @@ import time
 import traceback
 
 from flask import Flask, request, jsonify
+import cv2
+import os
+
+print("OpenCV version:", cv2.__version__)
+print("cv2 location:", cv2.__file__)
+print("haarcascades:", cv2.data.haarcascades)
+print("Exists:", os.path.exists(cv2.data.haarcascades))
+print("XML exists:", os.path.exists(
+    os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml")
+))
 
 # Optional CORS support for browser-based testing
 try:
